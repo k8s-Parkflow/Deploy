@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parking-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: parking-frontend
+  template:
+    metadata:
+      labels:
+        app: parking-frontend
+    spec:
+      containers:
+      - name: parking-frontend
+        image: johyungdong/parking-frontend:latest
+        ports:
+        - containerPort: 80
+        # 1. Readiness Probe
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        # 2. Liveness Probe
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: parking-frontend-ingress-service
+spec:
+  type: ClusterIP
+  selector:
+    app: parking-frontend
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: parking-frontend-ingress
+spec:
+  rules:
+  - host: parking-frontend.local  #본인 도메인  => 웹을 사용할 pc에서 현재 접속중인 가상머신 ip -> 10.0.2.101 도메인명 설정 필요
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: parking-frontend-ingress-service
+            port:
+              number: 80

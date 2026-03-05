@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parking-backend-blue
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: parking-backend
+      color: blue
+  template:
+    metadata:
+      labels:
+        app: parking-backend
+        color: blue
+    spec:
+      containers:
+      - name: parking-backend
+        image: johyungdong/parking-backend:latest
+        ports:
+        - containerPort: 8080
+        # HPA 사용을 위한 resource 설정
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1024Mi
+
+        # 1. Readiness Probe: 준비가 안 되면 Service의 부하분산 대상(Endpoints)에서 제외합니다.
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness  # Spring Boot 2.3+ 버전 기본 경로
+            port: 8080
+          initialDelaySeconds: 20  # 앱이 켜지는 동안 기다리는 시간
+          periodSeconds: 10        # 체크 간격
+          failureThreshold: 3      # 3번 실패하면 준비 안 된 것으로 간주
+
+        # 2. Liveness Probe: 응답이 없으면 파드를 죽이고 새로 생성(Restart)합니다.
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 30  # 실행 후 30초 뒤부터 체크 시작
+          periodSeconds: 15
+          failureThreshold: 3
+        # secret
+        env:
+        # 1. DB 접속 주소 설정
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: parking-secret
+              key: database_name
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:mariadb://parking-db-service:3306/$(DB_NAME)"
+
+        # 2. DB 사용자 이름
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: parking-secret
+              key: username
+
+        # 3. DB 사용자 비밀번호      
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: parking-secret
+              key: password
