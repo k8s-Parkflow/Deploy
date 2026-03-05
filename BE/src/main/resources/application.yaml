@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: autoE
+  profiles:
+    active: local
+
+management:
+  endpoint:
+    health:
+      show-details: always
+  endpoints:
+    web:
+      exposure:
+        include: health
+  health:
+    probes:
+      enabled: true
