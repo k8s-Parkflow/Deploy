@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: parking-backend
-        image: johyungdong/parking-backend:latest
+        image: hyungdongjo/parking-backend:latest
         ports:
         - containerPort: 8080
         # HPA 사용을 위한 resource 설정
