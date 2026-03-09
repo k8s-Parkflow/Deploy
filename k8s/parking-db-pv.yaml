@@ -1,15 +1,68 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: parking-db-pv-volume  # PV의 고유 이름
+  name: parking-db-command-pv 
+  labels:
+    type: command
 spec:
   capacity:
-    storage: 5Gi              # 사용자님이 PVC에서 요청한 5Gi와 똑같이 맞춤
+    storage: 5Gi
   volumeMode: Filesystem
   accessModes:
-    - ReadWriteOnce           # 한 노드에서 읽기/쓰기 가능
+    - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
   hostPath:
-    # 워커 노드의 실제 폴더 경로
-    path: /mnt/data/mariadb
+    path: /mnt/data/mariadb-command
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: parking-db-query-pv 
+  labels:
+    type: query
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /mnt/data/mariadb-query
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: parking-db-zone-pv 
+  labels:
+    type: zone
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /mnt/data/mariadb-zone 
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: parking-db-vehicle-pv 
+  labels:
+    type: vehicle
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /mnt/data/mariadb-vehicle
+    
