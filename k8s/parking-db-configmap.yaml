@@ -1,83 +1,150 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: parking-db-configmap
+  name: parking-db-command-config
 data:
   init.sql: |
-    -- 0. 데이터베이스 선택 (StatefulSet의 MARIADB_DATABASE와 일치해야 함)
-    USE parking_db;
+    CREATE DATABASE IF NOT EXISTS parking_command_db;
+    USE parking_command_db;
 
-    -- 1. ZONE 테이블 생성
-    CREATE TABLE IF NOT EXISTS ZONE (
-        zone_id INT AUTO_INCREMENT PRIMARY KEY,
-        zone_name VARCHAR(100) NOT NULL
-    );
-
-    -- 2. VEHICLE 테이블 생성
-    CREATE TABLE IF NOT EXISTS VEHICLE (
-        vehicle_num VARCHAR(50) PRIMARY KEY,
-        vehicle_type_code VARCHAR(20)
-    );
-
-    -- 3. SLOT_TYPE 테이블 생성
-    CREATE TABLE IF NOT EXISTS SLOT_TYPE (
-        slot_type_id INT AUTO_INCREMENT PRIMARY KEY,
-        type VARCHAR(50) NOT NULL
-    );
-
-    -- 4. ZONE_AVAILABILITY 테이블 생성
-    CREATE TABLE IF NOT EXISTS ZONE_AVAILABILITY (
-        zone_id INT PRIMARY KEY,
-        total_slots INT NOT NULL,
-        occupied_slots INT NOT NULL,
-        available_slots INT NOT NULL,
-        general_total INT NOT NULL,
-        general_occupied INT NOT NULL,
-        general_available INT NOT NULL,
-        ev_total INT NOT NULL,
-        ev_occupied INT NOT NULL,
-        ev_available INT NOT NULL,
-        disabled_total INT NOT NULL,
-        disabled_occupied INT NOT NULL,
-        disabled_available INT NOT NULL,
-        updated_at DATETIME,
-        CONSTRAINT fk_zone_avail_zone FOREIGN KEY (zone_id) REFERENCES ZONE(zone_id) ON DELETE CASCADE
-    );
-
-    -- 5. PARKING_SLOT 테이블 생성
+    -- 1. PARKING_SLOT 테이블
     CREATE TABLE IF NOT EXISTS PARKING_SLOT (
-        slot_id INT AUTO_INCREMENT PRIMARY KEY,
-        zone_id INT NOT NULL,
-        slot_type_id INT NOT NULL,
-        slot_code VARCHAR(50) NOT NULL,
-        is_active BOOLEAN NOT NULL DEFAULT TRUE,
-        CONSTRAINT fk_slot_zone FOREIGN KEY (zone_id) REFERENCES ZONE(zone_id),
-        CONSTRAINT fk_slot_type FOREIGN KEY (slot_type_id) REFERENCES SLOT_TYPE(slot_type_id)
-    );
+        slot_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '슬롯 PK (자동 증가)',
+        zone_id BIGINT NOT NULL COMMENT '존 식별자',
+        slot_type_id BIGINT NOT NULL COMMENT '슬롯 타입 식별자',
+        slot_code VARCHAR(50) NOT NULL COMMENT '존 내 슬롯 코드',
+        is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT '슬롯 활성 여부',
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 시각',
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 수정 시각',
+        CONSTRAINT uniq_slot_zone_slot_code UNIQUE (zone_id, slot_code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-    -- 6. PARKING_history 테이블 생성
-    CREATE TABLE IF NOT EXISTS PARKING_history (
-        history_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        zone_id INT NOT NULL,
-        slot_id INT NOT NULL,
-        vehicle_plate VARCHAR(50) NOT NULL,
-        entry_at DATETIME NOT NULL,
-        exit_at DATETIME,
-        status VARCHAR(20) NOT NULL,
-        CONSTRAINT fk_hist_zone FOREIGN KEY (zone_id) REFERENCES ZONE(zone_id),
-        CONSTRAINT fk_hist_slot FOREIGN KEY (slot_id) REFERENCES PARKING_SLOT(slot_id),
-        CONSTRAINT fk_hist_vehicle FOREIGN KEY (vehicle_plate) REFERENCES VEHICLE(vehicle_num)
-    );
+    -- 2. PARKING_HISTORY 테이블
+    CREATE TABLE IF NOT EXISTS PARKING_HISTORY (
+        history_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '주차 이력 PK',
+        slot_id BIGINT NOT NULL COMMENT '주차 슬롯 FK',
+        vehicle_num VARCHAR(20) NOT NULL COMMENT '차량 번호',
+        status VARCHAR(16) NOT NULL COMMENT '이력 상태',
+        entry_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '입차 시각',
+        exit_at TIMESTAMP NULL COMMENT '출차 시각',
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 시각',
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 수정 시각',
+        active_vehicle_num VARCHAR(20) AS (IF(exit_at IS NULL, vehicle_num, NULL)) VIRTUAL COMMENT '중복 방지용 가상 컬럼',
+        CONSTRAINT fk_history_slot FOREIGN KEY (slot_id) REFERENCES PARKING_SLOT(slot_id),
+        INDEX idx_history_slot_entry (slot_id, entry_at),
+        INDEX idx_history_vehicle_exit (vehicle_num, exit_at),
+        CONSTRAINT uniq_active_history_per_vehicle UNIQUE (active_vehicle_num)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-    -- 7. SLOT_OCCUPANCY 테이블 생성
+    -- 3. SLOT_OCCUPANCY 테이블
     CREATE TABLE IF NOT EXISTS SLOT_OCCUPANCY (
-        slot_id INT PRIMARY KEY,
-        occupied BOOLEAN NOT NULL DEFAULT FALSE,
-        current_session_id BIGINT,
-        vehicle_plate VARCHAR(50),
-        occupied_since DATETIME,
-        updated_at DATETIME,
-        CONSTRAINT fk_occ_slot FOREIGN KEY (slot_id) REFERENCES PARKING_SLOT(slot_id),
-        CONSTRAINT fk_occ_session FOREIGN KEY (current_session_id) REFERENCES PARKING_history(history_id),
-        CONSTRAINT fk_occ_vehicle FOREIGN KEY (vehicle_plate) REFERENCES VEHICLE(vehicle_num)
-    );
+        slot_id BIGINT PRIMARY KEY COMMENT '슬롯 PK/FK',
+        occupied BOOLEAN NOT NULL DEFAULT FALSE COMMENT '점유 여부',
+        vehicle_num VARCHAR(20) NULL COMMENT '현재 점유 차량 번호',
+        history_id BIGINT NULL COMMENT '현재 점유를 나타내는 이력 FK',
+        occupied_at TIMESTAMP NULL COMMENT '점유 시작 시각',
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 수정 시각',
+        CONSTRAINT fk_occupancy_slot FOREIGN KEY (slot_id) REFERENCES PARKING_SLOT(slot_id),
+        CONSTRAINT fk_occupancy_history FOREIGN KEY (history_id) REFERENCES PARKING_HISTORY(history_id),
+        CONSTRAINT slot_occupancy_consistency CHECK (
+            (occupied = TRUE AND vehicle_num IS NOT NULL AND history_id IS NOT NULL AND occupied_at IS NOT NULL)
+            OR
+            (occupied = FALSE AND vehicle_num IS NULL AND history_id IS NULL AND occupied_at IS NULL)
+        )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
+    FLUSH PRIVILEGES;
+---
+# 2. Query DB (조회용 서비스 전용)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: parking-db-query-config
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS parking_query_db;
+    USE parking_query_db;
+
+    -- 1. CURRENT_PARKING_VIEW 테이블 (현재 주차 중 차량 상태)
+    CREATE TABLE IF NOT EXISTS CURRENT_PARKING_VIEW (
+        vehicle_num VARCHAR(20) PRIMARY KEY COMMENT '차량 번호 PK',
+        slot_id BIGINT NOT NULL COMMENT '현재 점유 슬롯 ID',
+        zone_id BIGINT NOT NULL COMMENT '현재 점유 존 ID',
+        slot_type VARCHAR(50) NOT NULL COMMENT '슬롯 타입명',
+        entry_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '입차 시각',
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 갱신 시각'
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    -- 2. ZONE_AVAILABILITY 테이블 (가용성 지표)
+    CREATE TABLE IF NOT EXISTS ZONE_AVAILABILITY (
+        zone_id BIGINT NOT NULL COMMENT '존 ID',
+        slot_type VARCHAR(50) NOT NULL COMMENT '슬롯 타입명',
+        total_count INT NOT NULL DEFAULT 0 COMMENT '전체 슬롯 수',
+        occupied_count INT NOT NULL DEFAULT 0 COMMENT '점유 슬롯 수',
+        available_count INT NOT NULL DEFAULT 0 COMMENT '가용 슬롯 수',
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 갱신 시각',
+        CONSTRAINT uniq_zone_availability_zone_slot_type UNIQUE (zone_id, slot_type),
+        INDEX idx_zone_type (zone_id, slot_type),
+        CONSTRAINT chk_zone_availability_available_count CHECK (
+            available_count = total_count - occupied_count AND available_count >= 0
+        )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
+    FLUSH PRIVILEGES;
+
+---
+# 3. Vehicle DB (차량 정보 관리 전용)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: parking-db-vehicle-config
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS parking_vehicle_db;
+    USE parking_vehicle_db;
+
+    -- 1. VEHICLE 테이블 (차량 정보 관리)
+    CREATE TABLE IF NOT EXISTS VEHICLE (
+        vehicle_num VARCHAR(20) PRIMARY KEY COMMENT '차량 번호 PK',
+        vehicle_type VARCHAR(16) NOT NULL COMMENT '차량 타입 (GENERAL, EV, DISABLED)',
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 시각',
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 수정 시각',
+        CONSTRAINT chk_vehicle_type CHECK (vehicle_type IN ('GENERAL', 'EV', 'DISABLED'))
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
+    FLUSH PRIVILEGES;
+---
+# 4. Zone DB (주차 구역 및 슬롯 타입 관리 전용)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: parking-db-zone-config
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS parking_zone_db;
+    USE parking_zone_db;
+
+    -- 1. ZONE 테이블 (주차 구역 관리)
+    CREATE TABLE IF NOT EXISTS ZONE (
+        zone_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '존 PK (자동 증가)',
+        zone_name VARCHAR(100) NOT NULL COMMENT '존 이름 (유니크)',
+        is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT '존 활성 여부',
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 시각',
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 수정 시각',
+        CONSTRAINT uniq_zone_name UNIQUE (zone_name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    -- 2. SLOT_TYPE 테이블 (슬롯 타입 관리)
+    CREATE TABLE IF NOT EXISTS SLOT_TYPE (
+        slot_type_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '슬롯 타입 PK (자동 증가)',
+        type_name VARCHAR(50) NOT NULL COMMENT '슬롯 타입명 (유니크)',
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 시각',
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 수정 시각',
+        CONSTRAINT uniq_type_name UNIQUE (type_name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
+    FLUSH PRIVILEGES;
