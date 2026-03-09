@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: parking-db-zone-ss
+spec:
+  serviceName: parking-db-zone-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parking-db-zone
+  template:
+    metadata:
+      labels:
+        app: parking-db-zone
+    spec:
+      containers:
+      - name: mariadb
+        image: mariadb:10.6
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MARIADB_ROOT_PASSWORD
+          valueFrom: { secretKeyRef: { name: parking-secret, key: root_password } }
+        - name: MARIADB_USER
+          valueFrom: { secretKeyRef: { name: parking-secret, key: username } }
+        - name: MARIADB_PASSWORD
+          valueFrom: { secretKeyRef: { name: parking-secret, key: password } }
+        - name: MARIADB_DATABASE
+          valueFrom: { secretKeyRef: { name: parking-secret, key: zone_db_name } }
+        readinessProbe:
+          exec:
+            command: ["mariadb-admin", "ping", "-h", "localhost", "-p$(MARIADB_ROOT_PASSWORD)"]
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command: ["mariadb-admin", "ping", "-h", "localhost", "-p$(MARIADB_ROOT_PASSWORD)"]
+          initialDelaySeconds: 40
+          periodSeconds: 20
+        volumeMounts:
+        - name: parking-db-pvc
+          mountPath: /var/lib/mysql
+        - name: init-sql-volume
+          mountPath: /docker-entrypoint-initdb.d/init.sql
+          subPath: init.sql
+      volumes:
+      - name: init-sql-volume
+        configMap:
+          name: parking-db-zone-config
+  volumeClaimTemplates:
+  - metadata: { name: parking-db-pvc }
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources: { requests: { storage: 5Gi } }
+      storageClassName: manual
+      selector: { matchLabels: { type: zone } }
