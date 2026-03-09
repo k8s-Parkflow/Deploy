@@ -35,7 +35,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: parking-frontend-ingress-service
+  name: parking-frontend-service
 spec:
   type: ClusterIP
   selector:
