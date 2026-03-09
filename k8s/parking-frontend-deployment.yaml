@@ -43,20 +43,3 @@ spec:
   ports:
     - port: 80
       targetPort: 80
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: parking-frontend-ingress
-spec:
-  rules:
-  - host: parking-frontend.local  #본인 도메인  => 웹을 사용할 pc에서 현재 접속중인 가상머신 ip -> 10.0.2.101 도메인명 설정 필요
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: parking-frontend-ingress-service
-            port:
-              number: 80
