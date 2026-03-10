@@ -32,7 +32,7 @@ data:
         CONSTRAINT fk_history_slot FOREIGN KEY (slot_id) REFERENCES PARKING_SLOT(slot_id),
         INDEX idx_history_slot_entry (slot_id, entry_at),
         INDEX idx_history_vehicle_exit (vehicle_num, exit_at)
-        -- 'Unique where exit_at is null' 제약은 MySQL 8.0 표준 인덱스나 
+        -- 'Unique where exit_at is null' 제약은 MySQL 8.0 표준 인덱스나
         -- 어플리케이션 로직에서 처리하도록 컬럼 추가 없이 구성하였습니다.
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
