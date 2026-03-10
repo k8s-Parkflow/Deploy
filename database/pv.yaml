@@ -65,4 +65,20 @@ spec:
   storageClassName: manual
   hostPath:
     path: /mnt/data/mariadb-vehicle
-    
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: parking-db-orchestration-pv 
+  labels:
+    type: orchestration
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /mnt/data/mariadb-orchestration
