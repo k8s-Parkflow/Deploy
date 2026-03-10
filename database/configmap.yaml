@@ -9,43 +9,44 @@ data:
 
     -- 1. PARKING_SLOT 테이블
     CREATE TABLE IF NOT EXISTS PARKING_SLOT (
-        slot_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '슬롯 PK (자동 증가)',
-        zone_id BIGINT NOT NULL COMMENT '존 식별자',
-        slot_type_id BIGINT NOT NULL COMMENT '슬롯 타입 식별자',
-        slot_code VARCHAR(50) NOT NULL COMMENT '존 내 슬롯 코드',
-        is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT '슬롯 활성 여부',
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 시각',
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 수정 시각',
-        CONSTRAINT uniq_slot_zone_slot_code UNIQUE (zone_id, slot_code)
+        slot_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        zone_id BIGINT NOT NULL,
+        slot_type_id BIGINT NOT NULL,
+        slot_name VARCHAR(50) NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT uniq_slot_zone_slot_name UNIQUE (zone_id, slot_name)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
     -- 2. PARKING_HISTORY 테이블
     CREATE TABLE IF NOT EXISTS PARKING_HISTORY (
-        history_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '주차 이력 PK',
-        slot_id BIGINT NOT NULL COMMENT '주차 슬롯 FK',
-        vehicle_num VARCHAR(20) NOT NULL COMMENT '차량 번호',
-        status VARCHAR(16) NOT NULL COMMENT '이력 상태',
-        entry_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '입차 시각',
-        exit_at TIMESTAMP NULL COMMENT '출차 시각',
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 시각',
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 수정 시각',
-        active_vehicle_num VARCHAR(20) AS (IF(exit_at IS NULL, vehicle_num, NULL)) VIRTUAL COMMENT '중복 방지용 가상 컬럼',
+        history_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        slot_id BIGINT NOT NULL,
+        vehicle_num VARCHAR(20) NOT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'PARKED',
+        entry_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        exit_at TIMESTAMP NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_history_slot FOREIGN KEY (slot_id) REFERENCES PARKING_SLOT(slot_id),
         INDEX idx_history_slot_entry (slot_id, entry_at),
-        INDEX idx_history_vehicle_exit (vehicle_num, exit_at),
-        CONSTRAINT uniq_active_history_per_vehicle UNIQUE (active_vehicle_num)
+        INDEX idx_history_vehicle_exit (vehicle_num, exit_at)
+        -- 'Unique where exit_at is null' 제약은 MySQL 8.0 표준 인덱스나 
+        -- 어플리케이션 로직에서 처리하도록 컬럼 추가 없이 구성하였습니다.
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
     -- 3. SLOT_OCCUPANCY 테이블
     CREATE TABLE IF NOT EXISTS SLOT_OCCUPANCY (
-        slot_id BIGINT PRIMARY KEY COMMENT '슬롯 PK/FK',
-        occupied BOOLEAN NOT NULL DEFAULT FALSE COMMENT '점유 여부',
-        vehicle_num VARCHAR(20) NULL COMMENT '현재 점유 차량 번호',
-        history_id BIGINT NULL COMMENT '현재 점유를 나타내는 이력 FK',
-        occupied_at TIMESTAMP NULL COMMENT '점유 시작 시각',
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 수정 시각',
+        slot_id BIGINT PRIMARY KEY,
+        occupied BOOLEAN NOT NULL DEFAULT FALSE,
+        vehicle_num VARCHAR(20) NULL,
+        history_id BIGINT NULL,
+        occupied_at TIMESTAMP NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_occupancy_slot FOREIGN KEY (slot_id) REFERENCES PARKING_SLOT(slot_id),
         CONSTRAINT fk_occupancy_history FOREIGN KEY (history_id) REFERENCES PARKING_HISTORY(history_id),
+        CONSTRAINT uniq_history_id UNIQUE (history_id),
         CONSTRAINT slot_occupancy_consistency CHECK (
             (occupied = TRUE AND vehicle_num IS NOT NULL AND history_id IS NOT NULL AND occupied_at IS NOT NULL)
             OR
@@ -53,10 +54,20 @@ data:
         )
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+    -- 4. PARKING_COMMAND_OPERATION 테이블
+    CREATE TABLE IF NOT EXISTS PARKING_COMMAND_OPERATION (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        operation_id VARCHAR(64) NOT NULL,
+        action VARCHAR(64) NOT NULL,
+        response_payload JSON NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT uniq_parking_command_operation_action UNIQUE (operation_id, action)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
     GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
     FLUSH PRIVILEGES;
 ---
-# 2. Query DB (조회용 서비스 전용)
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -66,24 +77,28 @@ data:
     CREATE DATABASE IF NOT EXISTS parking_query_db;
     USE parking_query_db;
 
-    -- 1. CURRENT_PARKING_VIEW 테이블 (현재 주차 중 차량 상태)
+    -- 1. CURRENT_PARKING_VIEW 테이블
     CREATE TABLE IF NOT EXISTS CURRENT_PARKING_VIEW (
-        vehicle_num VARCHAR(20) PRIMARY KEY COMMENT '차량 번호 PK',
-        slot_id BIGINT NOT NULL COMMENT '현재 점유 슬롯 ID',
-        zone_id BIGINT NOT NULL COMMENT '현재 점유 존 ID',
-        slot_type VARCHAR(50) NOT NULL COMMENT '슬롯 타입명',
-        entry_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '입차 시각',
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 갱신 시각'
+        vehicle_num VARCHAR(20) PRIMARY KEY,
+        history_id BIGINT NULL,
+        zone_id BIGINT NULL,
+        slot_id BIGINT NULL,
+        zone_name VARCHAR(100) NULL,
+        slot_name VARCHAR(50) NULL,
+        slot_type VARCHAR(50) NOT NULL,
+        entry_at TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-    -- 2. ZONE_AVAILABILITY 테이블 (가용성 지표)
+    -- 2. ZONE_AVAILABILITY 테이블
     CREATE TABLE IF NOT EXISTS ZONE_AVAILABILITY (
-        zone_id BIGINT NOT NULL COMMENT '존 ID',
-        slot_type VARCHAR(50) NOT NULL COMMENT '슬롯 타입명',
-        total_count INT NOT NULL DEFAULT 0 COMMENT '전체 슬롯 수',
-        occupied_count INT NOT NULL DEFAULT 0 COMMENT '점유 슬롯 수',
-        available_count INT NOT NULL DEFAULT 0 COMMENT '가용 슬롯 수',
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 갱신 시각',
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        zone_id BIGINT NOT NULL,
+        slot_type VARCHAR(50) NOT NULL,
+        total_count INT NOT NULL,
+        occupied_count INT NOT NULL,
+        available_count INT NOT NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT uniq_zone_availability_zone_slot_type UNIQUE (zone_id, slot_type),
         INDEX idx_zone_type (zone_id, slot_type),
         CONSTRAINT chk_zone_availability_available_count CHECK (
@@ -91,11 +106,20 @@ data:
         )
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+    -- 3. PARKING_QUERY_OPERATION 테이블
+    CREATE TABLE IF NOT EXISTS PARKING_QUERY_OPERATION (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        operation_id VARCHAR(64) NOT NULL,
+        action VARCHAR(64) NOT NULL,
+        response_payload JSON NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT uniq_parking_query_operation_action UNIQUE (operation_id, action)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
     GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
     FLUSH PRIVILEGES;
-
 ---
-# 3. Vehicle DB (차량 정보 관리 전용)
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -105,19 +129,18 @@ data:
     CREATE DATABASE IF NOT EXISTS parking_vehicle_db;
     USE parking_vehicle_db;
 
-    -- 1. VEHICLE 테이블 (차량 정보 관리)
+    -- 1. VEHICLE 테이블
     CREATE TABLE IF NOT EXISTS VEHICLE (
-        vehicle_num VARCHAR(20) PRIMARY KEY COMMENT '차량 번호 PK',
-        vehicle_type VARCHAR(16) NOT NULL COMMENT '차량 타입 (GENERAL, EV, DISABLED)',
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 시각',
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 수정 시각',
+        vehicle_num VARCHAR(20) PRIMARY KEY,
+        vehicle_type VARCHAR(16) NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT chk_vehicle_type CHECK (vehicle_type IN ('GENERAL', 'EV', 'DISABLED'))
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
     GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
     FLUSH PRIVILEGES;
 ---
-# 4. Zone DB (주차 구역 및 슬롯 타입 관리 전용)
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -127,23 +150,60 @@ data:
     CREATE DATABASE IF NOT EXISTS parking_zone_db;
     USE parking_zone_db;
 
-    -- 1. ZONE 테이블 (주차 구역 관리)
+    -- 1. ZONE 테이블
     CREATE TABLE IF NOT EXISTS ZONE (
-        zone_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '존 PK (자동 증가)',
-        zone_name VARCHAR(100) NOT NULL COMMENT '존 이름 (유니크)',
-        is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT '존 활성 여부',
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 시각',
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 수정 시각',
+        zone_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        zone_name VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT uniq_zone_name UNIQUE (zone_name)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-    -- 2. SLOT_TYPE 테이블 (슬롯 타입 관리)
+    -- 2. SLOT_TYPE 테이블
     CREATE TABLE IF NOT EXISTS SLOT_TYPE (
-        slot_type_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '슬롯 타입 PK (자동 증가)',
-        type_name VARCHAR(50) NOT NULL COMMENT '슬롯 타입명 (유니크)',
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 시각',
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 수정 시각',
+        slot_type_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        type_name VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT uniq_type_name UNIQUE (type_name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
+    FLUSH PRIVILEGES;
+ ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: parking-db-orchestration-config
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS parking_orchestration_db;
+    USE parking_orchestration_db;
+
+    -- 1. SAGA_OPERATION 테이블
+    CREATE TABLE IF NOT EXISTS SAGA_OPERATION (
+        operation_id VARCHAR(64) PRIMARY KEY,
+        saga_type VARCHAR(16) NOT NULL,
+        status VARCHAR(32) NOT NULL,
+        idempotency_key VARCHAR(128) NOT NULL,
+        current_step VARCHAR(64) NULL,
+        failed_step VARCHAR(64) NULL,
+        history_id BIGINT NULL,
+        vehicle_num VARCHAR(20) NULL,
+        slot_id BIGINT NULL,
+        last_error_code VARCHAR(64) NULL,
+        last_error_message VARCHAR(255) NULL,
+        response_payload JSON NULL,
+        error_status INT NULL,
+        error_payload JSON NULL,
+        compensation_attempts INT NOT NULL DEFAULT 0,
+        completed_compensations JSON NOT NULL, -- 기본값 []는 애플리케이션 혹은 SQL에서 처리
+        next_retry_at TIMESTAMP NULL,
+        expires_at TIMESTAMP NULL,
+        cancelled_at TIMESTAMP NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT uniq_saga_operation_type_idempotency_key UNIQUE (saga_type, idempotency_key)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
     GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
