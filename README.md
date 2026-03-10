@@ -1,4 +1,5 @@
 ## 📁 폴더 구조
+```
 .
 ├── frontend/
 │   └── deployment.yaml
@@ -18,3 +19,4 @@
 └── base/
     ├── ingress.yaml
     └── secret.yaml
+```
