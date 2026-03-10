@@ -35,13 +35,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: parking-frontend-service 
+  name: parking-frontend-service
 spec:
-  type: ClusterIP 
+  type: ClusterIP
   selector:
     app: parking-frontend
   ports:
-    - port: 80     
+    - port: 80
       targetPort: 80
-
-==============================================================================================================================================       
