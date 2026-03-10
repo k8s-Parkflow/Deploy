@@ -10,6 +10,6 @@ urls.py: BE/urls.py → park_python/park_py/urls.py
 
 위치: BE/db_router.py 파일을 park_python/park_py/ 디렉토리 안으로 복사합니다.
 
-**3. nginx.conf 파일 이동**
+**3. nginx.conf & Frontend Dockerfile 파일 이동**
 
-위치 : nginx.conf파일을 ParkFlow 디렉토리 안으로 복사
+위치 : nginx.conf와 Frontend Dockerfile을 ParkFlow/client 디렉토리 안으로 복사
