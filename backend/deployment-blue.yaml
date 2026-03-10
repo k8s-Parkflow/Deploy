@@ -16,10 +16,9 @@ spec:
     spec:
       containers:
       - name: parking-backend
-        image: hyungdongjo/parking-backend:latest 
+        image: hyungdongjo/parking-backend:latest
         ports:
         - containerPort: 8000
-        
         resources:
           requests:
             cpu: 200m
