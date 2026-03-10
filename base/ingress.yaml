@@ -31,6 +31,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: parking-db-orchestration-service
+            name: parking-orchestration-app-service
             port:
               number: 80
