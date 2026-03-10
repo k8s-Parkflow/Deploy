@@ -1,0 +1,125 @@
+
+.parking-slot {
+  position: relative;
+  border-radius: var(--slot-r);
+  width: var(--slot-w, 6rem);
+  height: var(--slot-h, 0.5rem);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+
+  transition: background-color 200ms ease, box-shadow 200ms ease;
+}
+
+.parking-slot--highlighted {
+  background: linear-gradient(135deg, var(--c-yellow), var(--c-yellow-dark));
+  border-color: var(--c-yellow);
+  box-shadow: 0 0 16px 4px var(--c-yellow-glow);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.parking-slot--occupied {
+  background: linear-gradient(to bottom right, var(--c-bg), var(--c-surface) 40%);
+  border-color: var(--c-border);
+}
+
+.parking-slot--available {
+  background-color: var(--c-shadow);
+  border: 2px solid transparent;
+  border-color: var(--c-yellow-muted);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.parking-slot--available:hover {
+  background-color: var(--c-yellow-bg);
+  border-color: var(--c-yellow);
+}
+
+/* available handicapped slots */
+.parking-slot--handicapped.parking-slot--available {
+  border-color: var(--c-blue-glow);
+}
+
+.parking-slot--handicapped.parking-slot--available:hover {
+  background-color: var(--c-blue-bg);
+  border-color: var(--c-blue);
+}
+
+/* available ev slots */
+.parking-slot--ev.parking-slot--available {
+  border-color: var(--c-purple-glow);
+}
+
+.parking-slot--ev.parking-slot--available:hover {
+  background-color: var(--c-purple-bg);
+  border-color: var(--c-purple);
+}
+
+.parking-slot__number {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--c-yellow);
+}
+
+.parking-slot--highlighted .parking-slot__number {
+  color: var(--c-text);
+}
+
+.parking-slot__plate {
+  font-size: 9px;
+  font-family: monospace;
+  color: var(--c-yellow);
+  opacity: 0.6;
+}
+
+.parking-slot--highlighted .parking-slot__plate {
+  color: var(--c-text);
+}
+
+.parking-slot__car-icon {
+  color: var(--c-yellow);
+  width: 2.25rem; 
+  height: 2.25rem;
+  transition: transform 200ms ease;
+}
+
+.parking-slot__car-icon--flipped {
+  transform: scaleX(-1);
+}
+
+.parking-slot__car-icon--highlighted {
+  color: var(--c-text);
+}
+
+.parking-slot__badge {
+  position: absolute;
+  top: 0.25rem; 
+  right: 0.25rem; 
+  width: 1rem;   
+  height: 1rem; 
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.parking-slot__badge-icon {
+  width: 0.75rem; 
+  height: 0.75rem;
+}
+
+.parking-slot__badge-icon--ev {
+  color: var(--c-purple);
+}
+
+.parking-slot__badge-icon--handicapped {
+  color: var(--c-blue);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}

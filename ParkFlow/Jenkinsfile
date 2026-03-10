@@ -1,0 +1,14 @@
+pipeline {
+    agent {
+        kubernetes {
+            inheritFrom 'kubernetes' //설정한 Cloud 이름
+        }
+    }
+    stages {
+        stage('Hello') {
+            steps {
+                echo 'Hello! Jenkins is connected to repository ParkFlow!'
+            }
+        }
+    }
+}
