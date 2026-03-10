@@ -28,21 +28,20 @@ spec:
             cpu: 500m
             memory: 1024Mi
 
-        # Ingress 경로인 /api를 포함하여 헬스체크 경로 수정
         readinessProbe:
           httpGet:
-            path: /api/health/db/
+            path: /api/docs/swagger  # 확실히 존재하는 경로로 변경
             port: 8000
-          initialDelaySeconds: 15
-          periodSeconds: 10
-          failureThreshold: 3
+          initialDelaySeconds: 15    # 서버 부팅 대기 시간
+          periodSeconds: 10          # 10초마다 체크
+          failureThreshold: 3        # 3번 실패 시 서비스 제외
 
         livenessProbe:
           httpGet:
-            path: /api/health/db/
+            path: /api/docs/swagger
             port: 8000
-          initialDelaySeconds: 30
-          periodSeconds: 20
+          initialDelaySeconds: 40    # 앱이 완전히 준비될 때까지 좀 더 여유를 둠
+          periodSeconds: 20          # 너무 자주 체크하지 않도록 설정
 
         env:
         # 1. DB 인증 정보 (Secret의 실제 key 이름 반영)
