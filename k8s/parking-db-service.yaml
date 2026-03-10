@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: parking-db-command-service
+spec:
+  type: ClusterIP
+  selector:
+    app: parking-db-command
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: parking-db-query-service
+spec:
+  type: ClusterIP
+  selector:
+    app: parking-db-query
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: parking-db-zone-service
+spec:
+  type: ClusterIP
+  selector:
+    app: parking-db-zone
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: parking-db-vehicle-service
+spec:
+  type: ClusterIP
+  selector:
+    app: parking-db-vehicle
+  ports:
+    - port: 3306
+      targetPort: 3306
