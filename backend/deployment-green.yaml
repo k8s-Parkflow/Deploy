@@ -95,5 +95,3 @@ spec:
             secretKeyRef:
               name: parking-secret
               key: django_secret_key
-
-```
