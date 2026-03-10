@@ -26,3 +26,11 @@ spec:
             name: parking-frontend-service
             port:
               number: 80
+
+      - path: /api/saga  # 추가된 경로
+        pathType: Prefix
+        backend:
+          service:
+            name: parking-orchestration-service
+            port:
+              number: 80
