@@ -170,7 +170,7 @@ data:
 
     GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
     FLUSH PRIVILEGES;
- ---
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
