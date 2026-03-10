@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: your-repo/parking-orchestration-app:latest # 제작하신 이미지
+        image: hyungdongjo/parking-orchestration-app:latest 
         ports:
         - containerPort: 8000 # 앱 서버 포트
         env:
