@@ -14,13 +14,13 @@ spec:
     spec:
       containers:
       - name: app
-        image: hyungdongjo/parking-orchestration-app:latest
+        image: hyungdongjo/parking-zone-app:latest
         ports:
         - containerPort: 8000
         env:
-        - name: DB_HOST
+        - name: ZONE_DB_HOST
           value: "parking-db-zone-service"
-        - name: DB_NAME
+        - name: ZONE_DB_NAME
           valueFrom: { secretKeyRef: { name: parking-secret, key: zone_db_name } }
         - name: DB_USER
           valueFrom: { secretKeyRef: { name: parking-secret, key: username } }
