@@ -1,3 +1,4 @@
+# 1. Backend Blue HPA (사용자 진입점/게이트웨이)
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -7,42 +8,60 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: parking-backend-blue
-  minReplicas: 3
+  minReplicas: 2          # MSA 분리로 부하가 줄었으므로 2개로 시작
   maxReplicas: 10
   metrics:
-  # 1. CPU 기반 스케일링 설정
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 70  # cpu 사용량이 70% 이상 => 스케일 아웃
-  # 2. Memory 기반 스케일링 설정=> Springboot는 메모리 급증 X
+        averageUtilization: 70
   behavior:
-    # scaleUp: 조건 만족시 즉시 증가
     scaleUp:
       stabilizationWindowSeconds: 0
       policies:
-      - type : Percent
-        value: 50
-        periodSeconds: 60
       - type: Pods
         value: 2
         periodSeconds: 60
-      selectPolicy: Max
-      # Max => 50%증가와 2개 증가 중 더 큰 값 선택
-    # scaleDown: 5분 유지 후 감소
     scaleDown:
       stabilizationWindowSeconds: 300
       policies:
       - type: Percent
         value: 20
         periodSeconds: 60
+
+---
+
+# 2. Orchestration App HPA (SAGA 로직/트랜잭션 제어)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: parking-orchestration-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: parking-orchestration-app
+  minReplicas: 2          # 정합성 및 고가용성을 위해 최소 2개 유지
+  maxReplicas: 5          # 오케스트레이터는 DB 커넥션을 많이 쓰므로 적절히 제한
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60 # SAGA 로직 처리를 위해 좀 더 민감하게 설정
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
       - type: Pods
         value: 1
+        periodSeconds: 30 # 입차 요청 폭주 시 더 빠르게 대응
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
         periodSeconds: 60
-      selectPolicy: Min
-      # Min => 20% 감소와 1개 감소 중 더 작은 값 선택
-
-    # scaleUp: 15초마다 cpu 평균 사용량 >= 70% => 즉시 pod 증가 (60초당 최대 50% or 2개 증가 중 최대값 선택해 증가)
-    # scaleDown: 15초마다 cpu 평균 사용량 < 70% => 300초 대기 후 pod 감소 (60초당 20% or 1개 감소 중 최소값 선택해 감소)
