@@ -1,27 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: parking-vehicle-app
+  name: parking-query-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: parking-vehicle-app
+      app: parking-query-app
   template:
     metadata:
       labels:
-        app: parking-vehicle-app
+        app: parking-query-app
     spec:
       containers:
       - name: app
-        image: hyungdongjo/parking-vehicle-app:latest
+        image: hyungdongjo/parking-query-app:latest
         ports:
         - containerPort: 8000
         env:
-        - name: VEHICLE_DB_HOST
-          value: "parking-db-vehicle-service"
-        - name: VEHICLE_DB_NAME
-          valueFrom: { secretKeyRef: { name: parking-secret, key: vehicle_db_name } }
+        - name: PARKING_QUERY_DB_HOST
+          value: "parking-db-query-service"
+        - name: PARKING_QUERY_DB_NAME
+          valueFrom: { secretKeyRef: { name: parking-secret, key: query_db_name } }
         - name: DB_USER
           valueFrom: { secretKeyRef: { name: parking-secret, key: username } }
         - name: DB_PASSWORD
@@ -34,11 +34,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: parking-vehicle-app-service
+  name: parking-query-app-service
 spec:
   type: ClusterIP
   selector:
-    app: parking-vehicle-app
+    app: parking-query-app
   ports:
-    - port: 80      
-      targetPort: 8000 
+    - port: 80
+      targetPort: 8000
