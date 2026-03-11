@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parking-query-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parking-query-app
+  template:
+    metadata:
+      labels:
+        app: parking-query-app
+    spec:
+      containers:
+      - name: app
+        image: hyungdongjo/parking-orchestration-app:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DB_HOST
+          value: "parking-db-query-service"
+        - name: DB_NAME
+          valueFrom: { secretKeyRef: { name: parking-secret, key: query_db_name } }
+        - name: DB_USER
+          valueFrom: { secretKeyRef: { name: parking-secret, key: username } }
+        - name: DB_PASSWORD
+          valueFrom: { secretKeyRef: { name: parking-secret, key: password } }
+        - name: DJANGO_ALLOWED_HOSTS
+          value: "*"
+        - name: DJANGO_SECRET_KEY
+          valueFrom: { secretKeyRef: { name: parking-secret, key: django_secret_key } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: parking-query-app-service
+spec:
+  type: ClusterIP
+  selector:
+    app: parking-query-app
+  ports:
+    - port: 80
+      targetPort: 8000
