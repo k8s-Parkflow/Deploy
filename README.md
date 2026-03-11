@@ -7,6 +7,11 @@
 │   ├── deployment-blue.yaml
 │   ├── deployment-green.yaml
 │   ├── hpa.yaml
+│   ├── orchestration-deployment.yaml (API gateway)
+│   ├── command-deployment.yaml
+│   ├── query-deployment.yaml
+│   ├── vehicle-deployment.yaml
+│   ├── zone-deployment.yaml
 │   └── service.yaml
 ├── database/
 │   ├── command-ss.yaml
