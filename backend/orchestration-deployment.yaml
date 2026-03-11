@@ -1,9 +1,10 @@
+# 1. 오케스트레이션 앱 (App)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: parking-orchestration-app
 spec:
-  replicas: 1
+  replicas: 2  # 고가용성과 HPA 설정을 고려해 2로 증설 권장
   selector:
     matchLabels:
       app: parking-orchestration-app
@@ -17,6 +18,17 @@ spec:
         image: hyungdongjo/parking-orchestration-app:latest
         ports:
         - containerPort: 8000
+
+        # --- 리소스 제한 설정 추가 ---
+        resources:
+          requests:
+            cpu: 100m      # HPA가 사용률을 계산하는 기준 (0.1 코어)
+            memory: 256Mi
+          limits:
+            cpu: 300m      # 파드가 최대로 사용할 수 있는 한계
+            memory: 512Mi
+        # ----------------------------
+
         env:
         - name: DB_HOST
           value: "parking-db-orchestration-service"
@@ -26,11 +38,16 @@ spec:
           valueFrom: { secretKeyRef: { name: parking-secret, key: username } }
         - name: DB_PASSWORD
           valueFrom: { secretKeyRef: { name: parking-secret, key: password } }
-
         - name: DJANGO_ALLOWED_HOSTS
           value: "*"
         - name: DJANGO_SECRET_KEY
           valueFrom: { secretKeyRef: { name: parking-secret, key: django_secret_key } }
+        - name: VEHICLE_SERVICE_URL
+          value: "http://parking-vehicle-app-service:80"
+        - name: ZONE_SERVICE_URL
+          value: "http://parking-zone-app-service:80"
+        - name: COMMAND_SERVICE_URL
+          value: "http://parking-command-app-service:80"
 ---
 apiVersion: v1
 kind: Service
