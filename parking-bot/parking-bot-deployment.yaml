@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: traffic-bot
-        image: hyungdongjo/parking-bot:latest
+        image: hyungdongjo/parking-bot:v4
         env:
         - name: API_URL
           value: "http://parking-backend-service/api/v1/parking"
