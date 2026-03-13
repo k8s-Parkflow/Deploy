@@ -1,84 +1,217 @@
+# [1] Orchestration
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: parking-db-command-pv 
-  labels:
-    type: command
+  name: parking-db-orchestration-pv
 spec:
-  capacity:
-    storage: 5Gi
-  volumeMode: Filesystem
-  accessModes:
-    - ReadWriteOnce
+  capacity: { storage: 1Gi }
+  accessModes: ["ReadWriteMany"]
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
-  hostPath:
-    path: /mnt/data/mariadb-command
+  hostPath: { path: /mnt/data/parking/orchestration }
 ---
 apiVersion: v1
-kind: PersistentVolume
+kind: PersistentVolumeClaim
 metadata:
-  name: parking-db-query-pv 
-  labels:
-    type: query
+  name: parking-db-pvc-orchestration
 spec:
-  capacity:
-    storage: 5Gi
-  volumeMode: Filesystem
-  accessModes:
-    - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Retain
+  accessModes: ["ReadWriteMany"]
+  resources: { requests: { storage: 1Gi } }
   storageClassName: manual
-  hostPath:
-    path: /mnt/data/mariadb-query
+  volumeName: parking-db-orchestration-pv
 ---
+# [2] Vehicle
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: parking-db-zone-pv 
-  labels:
-    type: zone
+  name: parking-db-vehicle-pv
 spec:
-  capacity:
-    storage: 5Gi
-  volumeMode: Filesystem
-  accessModes:
-    - ReadWriteOnce
+  capacity: { storage: 1Gi }
+  accessModes: ["ReadWriteMany"]
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
-  hostPath:
-    path: /mnt/data/mariadb-zone 
+  hostPath: { path: /mnt/data/parking/vehicle }
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: parking-db-pvc-vehicle
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources: { requests: { storage: 1Gi } }
+  storageClassName: manual
+  volumeName: parking-db-vehicle-pv
+---
+# [3] Zone
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: parking-db-vehicle-pv 
-  labels:
-    type: vehicle
+  name: parking-db-zone-pv
 spec:
-  capacity:
-    storage: 5Gi
-  volumeMode: Filesystem
-  accessModes:
-    - ReadWriteOnce
+  capacity: { storage: 1Gi }
+  accessModes: ["ReadWriteMany"]
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
-  hostPath:
-    path: /mnt/data/mariadb-vehicle
+  hostPath: { path: /mnt/data/parking/zone }
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: parking-db-pvc-zone
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources: { requests: { storage: 1Gi } }
+  storageClassName: manual
+  volumeName: parking-db-zone-pv
+---
+# [4] Parking Command
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: parking-db-orchestration-pv 
-  labels:
-    type: orchestration
+  name: parking-db-command-pv
 spec:
-  capacity:
-    storage: 5Gi
-  volumeMode: Filesystem
-  accessModes:
-    - ReadWriteOnce
+  capacity: { storage: 1Gi }
+  accessModes: ["ReadWriteMany"]
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
-  hostPath:
-    path: /mnt/data/mariadb-orchestration
+  hostPath: { path: /mnt/data/parking/command }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: parking-db-pvc-command
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources: { requests: { storage: 1Gi } }
+  storageClassName: manual
+  volumeName: parking-db-command-pv
+---
+# [5] Parking Query
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: parking-db-query-pv
+spec:
+  capacity: { storage: 1Gi }
+  accessModes: ["ReadWriteMany"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath: { path: /mnt/data/parking/query }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: parking-db-pvc-query
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources: { requests: { storage: 1Gi } }
+  storageClassName: manual
+  volumeName: parking-db-query-pv1~# [1] Orchestration
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: parking-db-orchestration-pv
+spec:
+  capacity: { storage: 1Gi }
+  accessModes: ["ReadWriteMany"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath: { path: /mnt/data/parking/orchestration }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: parking-db-pvc-orchestration
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources: { requests: { storage: 1Gi } }
+  storageClassName: manual
+  volumeName: parking-db-orchestration-pv
+---
+# [2] Vehicle
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: parking-db-vehicle-pv
+spec:
+  capacity: { storage: 1Gi }
+  accessModes: ["ReadWriteMany"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath: { path: /mnt/data/parking/vehicle }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: parking-db-pvc-vehicle
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources: { requests: { storage: 1Gi } }
+  storageClassName: manual
+  volumeName: parking-db-vehicle-pv
+---
+# [3] Zone
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: parking-db-zone-pv
+spec:
+  capacity: { storage: 1Gi }
+  accessModes: ["ReadWriteMany"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath: { path: /mnt/data/parking/zone }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: parking-db-pvc-zone
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources: { requests: { storage: 1Gi } }
+  storageClassName: manual
+  volumeName: parking-db-zone-pv
+---
+# [4] Parking Command
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: parking-db-command-pv
+spec:
+  capacity: { storage: 1Gi }
+  accessModes: ["ReadWriteMany"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath: { path: /mnt/data/parking/command }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: parking-db-pvc-command
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources: { requests: { storage: 1Gi } }
+  storageClassName: manual
+  volumeName: parking-db-command-pv
+---
+# [5] Parking Query
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: parking-db-query-pv
+spec:
+  capacity: { storage: 1Gi }
+  accessModes: ["ReadWriteMany"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath: { path: /mnt/data/parking/query }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: parking-db-pvc-query
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources: { requests: { storage: 1Gi } }
+  storageClassName: manual
+  volumeName: parking-db-query-pv

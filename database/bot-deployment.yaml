@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parking-bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parking-bot
+  template:
+    metadata:
+      labels:
+        app: parking-bot
+    spec:
+      containers:
+      - name: traffic-bot
+        image: hyungdongjo/parking-bot:latest
+        env:
+        - name: API_URL
+          value: "http://orchestration-http"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi

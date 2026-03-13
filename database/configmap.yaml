@@ -1,210 +1,160 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: parking-db-command-config
+  name: parking-db-init-config
 data:
-  init.sql: |
-    CREATE DATABASE IF NOT EXISTS parking_command_db;
-    USE parking_command_db;
-
-    -- 1. PARKING_SLOT 테이블
-    CREATE TABLE IF NOT EXISTS PARKING_SLOT (
-        slot_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        zone_id BIGINT NOT NULL,
-        slot_type_id BIGINT NOT NULL,
-        slot_name VARCHAR(50) NOT NULL,
-        is_active BOOLEAN NOT NULL DEFAULT TRUE,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT uniq_slot_zone_slot_name UNIQUE (zone_id, slot_name)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-    -- 2. PARKING_HISTORY 테이블
-    CREATE TABLE IF NOT EXISTS PARKING_HISTORY (
-        history_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        slot_id BIGINT NOT NULL,
-        vehicle_num VARCHAR(20) NOT NULL,
-        status VARCHAR(16) NOT NULL DEFAULT 'PARKED',
-        entry_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        exit_at TIMESTAMP NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT fk_history_slot FOREIGN KEY (slot_id) REFERENCES PARKING_SLOT(slot_id),
-        INDEX idx_history_slot_entry (slot_id, entry_at),
-        INDEX idx_history_vehicle_exit (vehicle_num, exit_at)
-        -- 'Unique where exit_at is null' 제약은 MySQL 8.0 표준 인덱스나
-        -- 어플리케이션 로직에서 처리하도록 컬럼 추가 없이 구성하였습니다.
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-    -- 3. SLOT_OCCUPANCY 테이블
-    CREATE TABLE IF NOT EXISTS SLOT_OCCUPANCY (
-        slot_id BIGINT PRIMARY KEY,
-        occupied BOOLEAN NOT NULL DEFAULT FALSE,
-        vehicle_num VARCHAR(20) NULL,
-        history_id BIGINT NULL,
-        occupied_at TIMESTAMP NULL,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT fk_occupancy_slot FOREIGN KEY (slot_id) REFERENCES PARKING_SLOT(slot_id),
-        CONSTRAINT fk_occupancy_history FOREIGN KEY (history_id) REFERENCES PARKING_HISTORY(history_id),
-        CONSTRAINT uniq_history_id UNIQUE (history_id),
-        CONSTRAINT slot_occupancy_consistency CHECK (
-            (occupied = TRUE AND vehicle_num IS NOT NULL AND history_id IS NOT NULL AND occupied_at IS NOT NULL)
-            OR
-            (occupied = FALSE AND vehicle_num IS NULL AND history_id IS NULL AND occupied_at IS NULL)
-        )
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-    -- 4. PARKING_COMMAND_OPERATION 테이블
+  # [1] parking-command-service: 쓰기 모델 및 점유 제어 (SQLite)
+  command-init.sql: |
+    -- 로컬 멱등 처리 결과 저장
     CREATE TABLE IF NOT EXISTS PARKING_COMMAND_OPERATION (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        operation_id VARCHAR(64) NOT NULL,
-        action VARCHAR(64) NOT NULL,
-        response_payload JSON NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT uniq_parking_command_operation_action UNIQUE (operation_id, action)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        operation_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        response_payload TEXT, -- JSON snapshot
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (operation_id, action)
+    );
 
-    GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
-    FLUSH PRIVILEGES;
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: parking-db-query-config
-data:
-  init.sql: |
-    CREATE DATABASE IF NOT EXISTS parking_query_db;
-    USE parking_query_db;
+    -- Lock Anchor (Zone-service 미러)
+    CREATE TABLE IF NOT EXISTS PARKING_SLOT (
+        slot_id INTEGER PRIMARY KEY,
+        zone_id INTEGER NOT NULL,
+        slot_name TEXT NOT NULL,
+        is_active INTEGER NOT NULL CHECK (is_active IN (0, 1)),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS uniq_slot_zone_slot_name ON PARKING_SLOT(zone_id, slot_name);
 
-    -- 1. CURRENT_PARKING_VIEW 테이블
-    CREATE TABLE IF NOT EXISTS CURRENT_PARKING_VIEW (
-        vehicle_num VARCHAR(20) PRIMARY KEY,
-        history_id BIGINT NULL,
-        zone_id BIGINT NULL,
-        slot_id BIGINT NULL,
-        zone_name VARCHAR(100) NULL,
-        slot_name VARCHAR(50) NULL,
-        slot_type VARCHAR(50) NOT NULL,
-        entry_at TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    -- 주차 세션 이력
+    CREATE TABLE IF NOT EXISTS PARKING_HISTORY (
+        history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        slot_id INTEGER NOT NULL,
+        zone_id INTEGER NOT NULL,
+        slot_type_id INTEGER NOT NULL,
+        slot_name TEXT NOT NULL,
+        vehicle_num TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('PARKED', 'EXITED')),
+        entry_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        exit_at DATETIME NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (slot_id) REFERENCES PARKING_SLOT(slot_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_history_slot_entry ON PARKING_HISTORY(slot_id, entry_at);
+    CREATE INDEX IF NOT EXISTS idx_history_vehicle_exit ON PARKING_HISTORY(vehicle_num, exit_at);
 
-    -- 2. ZONE_AVAILABILITY 테이블
-    CREATE TABLE IF NOT EXISTS ZONE_AVAILABILITY (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        zone_id BIGINT NOT NULL,
-        slot_type VARCHAR(50) NOT NULL,
-        total_count INT NOT NULL,
-        occupied_count INT NOT NULL,
-        available_count INT NOT NULL,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT uniq_zone_availability_zone_slot_type UNIQUE (zone_id, slot_type),
-        INDEX idx_zone_type (zone_id, slot_type),
-        CONSTRAINT chk_zone_availability_available_count CHECK (
-            available_count = total_count - occupied_count AND available_count >= 0
+    -- 현재 점유 상태
+    CREATE TABLE IF NOT EXISTS SLOT_OCCUPANCY (
+        slot_id INTEGER PRIMARY KEY,
+        occupied INTEGER NOT NULL CHECK (occupied IN (0, 1)),
+        vehicle_num TEXT NULL,
+        history_id INTEGER NULL,
+        occupied_at DATETIME NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (slot_id) REFERENCES PARKING_SLOT(slot_id),
+        FOREIGN KEY (history_id) REFERENCES PARKING_HISTORY(history_id),
+        UNIQUE (history_id),
+        CHECK (
+            (occupied = 1 AND vehicle_num IS NOT NULL AND history_id IS NOT NULL AND occupied_at IS NOT NULL)
+            OR
+            (occupied = 0 AND vehicle_num IS NULL AND history_id IS NULL AND occupied_at IS NULL)
         )
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    );
 
-    -- 3. PARKING_QUERY_OPERATION 테이블
+  # [2] parking-query-service: 조회 전용 Projection (SQLite)
+  query-init.sql: |
     CREATE TABLE IF NOT EXISTS PARKING_QUERY_OPERATION (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        operation_id VARCHAR(64) NOT NULL,
-        action VARCHAR(64) NOT NULL,
-        response_payload JSON NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT uniq_parking_query_operation_action UNIQUE (operation_id, action)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        operation_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        response_payload TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (operation_id, action)
+    );
 
-    GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
-    FLUSH PRIVILEGES;
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: parking-db-vehicle-config
-data:
-  init.sql: |
-    CREATE DATABASE IF NOT EXISTS parking_vehicle_db;
-    USE parking_vehicle_db;
+    CREATE TABLE IF NOT EXISTS CURRENT_PARKING_VIEW (
+        vehicle_num TEXT PRIMARY KEY,
+        history_id INTEGER NULL,
+        zone_id INTEGER NULL,
+        slot_id INTEGER NULL,
+        slot_code TEXT NULL,
+        zone_name TEXT NULL,
+        slot_name TEXT NULL,
+        slot_type TEXT NOT NULL,
+        entry_at DATETIME NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
 
-    -- 1. VEHICLE 테이블
+    CREATE TABLE IF NOT EXISTS ZONE_AVAILABILITY (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        zone_id INTEGER NOT NULL,
+        slot_type TEXT NOT NULL,
+        total_count INTEGER NOT NULL,
+        occupied_count INTEGER NOT NULL,
+        available_count INTEGER NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (zone_id, slot_type),
+        CHECK (available_count = total_count - occupied_count AND available_count >= 0)
+    );
+    CREATE INDEX IF NOT EXISTS idx_zone_type ON ZONE_AVAILABILITY(zone_id, slot_type);
+
+  # [3] vehicle-service: 차량 마스터 정보 (SQLite)
+  vehicle-init.sql: |
     CREATE TABLE IF NOT EXISTS VEHICLE (
-        vehicle_num VARCHAR(20) PRIMARY KEY,
-        vehicle_type VARCHAR(16) NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT chk_vehicle_type CHECK (vehicle_type IN ('GENERAL', 'EV', 'DISABLED'))
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        vehicle_num TEXT PRIMARY KEY,
+        vehicle_type TEXT NOT NULL CHECK (vehicle_type IN ('GENERAL', 'EV', 'DISABLED')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
 
-    GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
-    FLUSH PRIVILEGES;
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: parking-db-zone-config
-data:
-  init.sql: |
-    CREATE DATABASE IF NOT EXISTS parking_zone_db;
-    USE parking_zone_db;
-
-    -- 1. ZONE 테이블
+  # [4] zone-service: 슬롯 메타데이터 마스터 (SQLite)
+  zone-init.sql: |
     CREATE TABLE IF NOT EXISTS ZONE (
-        zone_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        zone_name VARCHAR(100) NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT uniq_zone_name UNIQUE (zone_name)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        zone_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        zone_name TEXT NOT NULL UNIQUE,
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
 
-    -- 2. SLOT_TYPE 테이블
     CREATE TABLE IF NOT EXISTS SLOT_TYPE (
-        slot_type_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        type_name VARCHAR(50) NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT uniq_type_name UNIQUE (type_name)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        slot_type_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type_name TEXT NOT NULL UNIQUE,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
 
-    GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
-    FLUSH PRIVILEGES;
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: parking-db-orchestration-config
-data:
-  init.sql: |
-    CREATE DATABASE IF NOT EXISTS parking_orchestration_db;
-    USE parking_orchestration_db;
+    CREATE TABLE IF NOT EXISTS ZONE_PARKING_SLOT (
+        slot_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        zone_id INTEGER NOT NULL,
+        slot_type_id INTEGER NOT NULL,
+        slot_code TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (zone_id) REFERENCES ZONE(zone_id),
+        FOREIGN KEY (slot_type_id) REFERENCES SLOT_TYPE(slot_type_id)
+    );
 
-    -- 1. SAGA_OPERATION 테이블
+  # [5] orchestration-service: Saga 상태 관리 (SQLite)
+  orchestration-init.sql: |
     CREATE TABLE IF NOT EXISTS SAGA_OPERATION (
-        operation_id VARCHAR(64) PRIMARY KEY,
-        saga_type VARCHAR(16) NOT NULL,
-        status VARCHAR(32) NOT NULL,
-        idempotency_key VARCHAR(128) NOT NULL,
-        current_step VARCHAR(64) NULL,
-        failed_step VARCHAR(64) NULL,
-        history_id BIGINT NULL,
-        vehicle_num VARCHAR(20) NULL,
-        slot_id BIGINT NULL,
-        last_error_code VARCHAR(64) NULL,
-        last_error_message VARCHAR(255) NULL,
-        response_payload JSON NULL,
-        error_status INT NULL,
-        error_payload JSON NULL,
-        compensation_attempts INT NOT NULL DEFAULT 0,
-        completed_compensations JSON NOT NULL, -- 기본값 []는 애플리케이션 혹은 SQL에서 처리
-        next_retry_at TIMESTAMP NULL,
-        expires_at TIMESTAMP NULL,
-        cancelled_at TIMESTAMP NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT uniq_saga_operation_type_idempotency_key UNIQUE (saga_type, idempotency_key)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-    GRANT ALL PRIVILEGES ON *.* TO 'username123'@'%';
-    FLUSH PRIVILEGES;
+        operation_id TEXT PRIMARY KEY,
+        idempotency_key TEXT NOT NULL UNIQUE,
+        saga_type TEXT NOT NULL CHECK (saga_type IN ('ENTRY', 'EXIT')),
+        status TEXT NOT NULL,
+        current_step TEXT NULL,
+        history_id INTEGER NULL,
+        vehicle_num TEXT NULL,
+        slot_id INTEGER NULL,
+        last_error_code TEXT NULL,
+        last_error_message TEXT NULL,
+        result_snapshot TEXT NOT NULL, -- JSON snapshot
+        completed_compensations TEXT NOT NULL, -- JSON list
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME NULL
+    );
