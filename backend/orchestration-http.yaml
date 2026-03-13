@@ -42,13 +42,13 @@ spec:
 
         # --- gRPC 서비스 주소 설정 추가 (이 부분이 핵심입니다) ---
         - name: VEHICLE_SERVICE_GRPC_TARGET
-          value: "vehicle-grpc:50051"
+          value: "vehicle-grpc:50015"
         - name: ZONE_SERVICE_GRPC_TARGET
-          value: "zone-grpc:50052"
+          value: "zone-grpc:50016"
         - name: PARKING_COMMAND_SERVICE_GRPC_TARGET
-          value: "parking-command-grpc:50053"
+          value: "parking-command-grpc:50017"
         - name: PARKING_QUERY_SERVICE_GRPC_TARGET
-          value: "parking-query-grpc:50054"
+          value: "parking-query-grpc:50018"
         # --------------------------------------------------
 
         volumeMounts:
