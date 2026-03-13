@@ -1,39 +1,4 @@
-# 1. Backend Blue HPA (사용자 진입점/게이트웨이)
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: parking-backend-hpa
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: parking-backend-blue
-  minReplicas: 2          # MSA 분리로 부하가 줄었으므로 2개로 시작
-  maxReplicas: 10
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 0
-      policies:
-      - type: Pods
-        value: 2
-        periodSeconds: 60
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-      - type: Percent
-        value: 20
-        periodSeconds: 60
-
----
-
-# 2. Orchestration App HPA (SAGA 로직/트랜잭션 제어)
+# 1. Orchestration App HPA (SAGA 로직/트랜잭션 제어)
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -43,7 +8,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: parking-orchestration-app
-  minReplicas: 2          # 정합성 및 고가용성을 위해 최소 2개 유지
+  minReplicas: 1          # 정합성 및 고가용성을 위해 최소 2개 유지
   maxReplicas: 5          # 오케스트레이터는 DB 커넥션을 많이 쓰므로 적절히 제한
   metrics:
   - type: Resource

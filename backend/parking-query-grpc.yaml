@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parking-query-grpc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parking-query-grpc
+  template:
+    metadata:
+      labels:
+        app: parking-query-grpc
+    spec:
+      containers:
+      - name: app
+        image: hyungdongjo/parking-query-app:latest
+        imagePullPolicy: Always
+        command: ["/bin/sh", "-c"]
+        args: ["python manage.py run_parking_query_grpc"]
+
+        # --- [추가] 볼륨 마운트 ---
+        volumeMounts:
+        - name: db-storage
+          mountPath: /app/data
+
+        env:
+        # [수정] SQLite 경로 설정
+        - name: DATABASE_NAME
+          value: "/app/data/query.sqlite3"
+        - name: PARKING_QUERY_DB_NAME
+          value: "/app/data/query.sqlite3"
+
+        # 포트 및 기본 설정
+        - name: PARKING_QUERY_GRPC_PORT
+          value: "50054"
+        - name: DJANGO_SETTINGS_MODULE
+          value: "park_py.settings_parking_query"
+        - name: DJANGO_SECRET_KEY
+          valueFrom: { secretKeyRef: { name: parking-secret, key: django_secret_key } }
+        - name: VEHICLE_SERVICE_GRPC_TARGET
+          value: "vehicle-grpc:50051"
+        - name: ZONE_SERVICE_GRPC_TARGET
+          value: "zone-grpc:50052"
+        - name: PARKING_COMMAND_SERVICE_GRPC_TARGET
+          value: "parking-query-grpc:50053"
+      # --- [추가] 볼륨 정의 ---
+      volumes:
+      - name: db-storage
+        persistentVolumeClaim:
+          claimName: parking-db-pvc-query
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: parking-query-grpc
+spec:
+  selector:
+    app: parking-query-grpc
+  ports:
+    - port: 50054
+      targetPort: 50054
