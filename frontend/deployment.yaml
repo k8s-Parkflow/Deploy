@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: parking-frontend
-        image: hyungdongjo/parking-frontend:v25
+        image: hyungdongjo/parking-frontend:v26
         ports:
         - containerPort: 80
         # 1. Readiness Probe
