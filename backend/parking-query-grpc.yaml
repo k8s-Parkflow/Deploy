@@ -39,11 +39,11 @@ spec:
         - name: DJANGO_SECRET_KEY
           valueFrom: { secretKeyRef: { name: parking-secret, key: django_secret_key } }
         - name: VEHICLE_SERVICE_GRPC_TARGET
-          value: "vehicle-grpc:50051"
+          value: "vehicle-grpc:500515"
         - name: ZONE_SERVICE_GRPC_TARGET
-          value: "zone-grpc:50052"
+          value: "zone-grpc:500516"
         - name: PARKING_COMMAND_SERVICE_GRPC_TARGET
-          value: "parking-query-grpc:50053"
+          value: "parking-query-grpc:500517"
       # --- [추가] 볼륨 정의 ---
       volumes:
       - name: db-storage
@@ -58,5 +58,5 @@ spec:
   selector:
     app: parking-query-grpc
   ports:
-    - port: 50054
-      targetPort: 50054
+    - port: 50018
+      targetPort: 50018
