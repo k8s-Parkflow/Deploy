@@ -33,17 +33,17 @@ spec:
 
         # 포트 및 기본 설정
         - name: ZONE_GRPC_PORT
-          value: "50052"
+          value: "50016"
         - name: DJANGO_SETTINGS_MODULE
           value: "park_py.settings_zone"
         - name: DJANGO_SECRET_KEY
           valueFrom: { secretKeyRef: { name: parking-secret, key: django_secret_key } }
         - name: VEHICLE_SERVICE_GRPC_TARGET
-          value: "vehicle-grpc:50051"
+          value: "vehicle-grpc:50015"
         - name: PARKING_COMMAND_SERVICE_GRPC_TARGET
-          value: "zone-grpc:50053"
+          value: "zone-grpc:50017"
         - name: PARKING_QUERY_SERVICE_GRPC_TARGET
-          value: "parking-query-grpc:50054"
+          value: "parking-query-grpc:50018"
       # --- [추가] 볼륨 정의 ---
       volumes:
       - name: db-storage
@@ -58,5 +58,5 @@ spec:
   selector:
     app: zone-grpc
   ports:
-    - port: 50052
-      targetPort: 50052
+    - port: 50016
+      targetPort: 50016
