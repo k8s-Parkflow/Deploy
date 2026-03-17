@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: orchestration-db
+spec:
+  serviceName: "orchestration-db-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orchestration-db
+  template:
+    metadata:
+      labels:
+        app: orchestration-db
+    spec:
+      containers:
+      - name: mariadb
+        image: mariadb:10.6
+        env:
+        - name: MARIADB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: parking-db-secret
+              key: root-password
+        - name: MARIADB_USER
+          valueFrom:
+            secretKeyRef:
+              name: parking-db-secret
+              key: user-id
+        - name: MARIADB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: parking-db-secret
+              key: user-password
+        - name: MARIADB_DATABASE
+          value: "parking_db"
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mariadb-data
+          mountPath: /var/lib/mysql
+        - name: init-sql
+          mountPath: /docker-entrypoint-initdb.d
+      volumes:
+      - name: init-sql
+        configMap:
+          name: parking-db-init-config
+          items:
+          - key: "orchestration-init.sql"
+            path: "05-orchestration.sql"
+
+  volumeClaimTemplates:
+  - metadata:
+      name: mariadb-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "manual"
+      selector:
+        matchLabels:
+          app: orchestration-db
+      resources:
+        requests:
+          storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestration-db-service
+spec:
+  ports:
+  - port: 3306
+    name: mysql
+  clusterIP: None
+  selector:
+    app: orchestration-db
