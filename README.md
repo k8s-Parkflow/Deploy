@@ -1,4 +1,5 @@
 ## NFS 이용
+# [마스터 노드]
 # 1. NFS 서버 패키지 설치
 sudo apt update && sudo apt install -y nfs-kernel-server
 
@@ -14,7 +15,7 @@ echo "/srv/nfs/mariadb 10.0.2.0/24(rw,sync,no_subtree_check,no_root_squash)" | s
 sudo exportfs -ra
 sudo systemctl restart nfs-kernel-server
 
-# 6. 워커노드
+# [워커노드]
 sudo apt update && sudo apt install -y nfs-common
 
 ## 📁 폴더 구조
