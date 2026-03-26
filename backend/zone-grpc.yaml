@@ -31,6 +31,8 @@ spec:
           valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-id } }
         - name: ZONE_DB_PASSWORD
           valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-password } }
+        - name: DJANGO_SECRET_KEY
+          valueFrom: { secretKeyRef: { name: parking-secret, key: django_secret_key } }
 ---
 apiVersion: v1
 kind: Service
