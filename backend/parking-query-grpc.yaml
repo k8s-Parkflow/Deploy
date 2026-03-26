@@ -16,47 +16,34 @@ spec:
       - name: app
         image: hyungdongjo/parking-query-app:latest
         imagePullPolicy: Always
-        command: ["/bin/sh", "-c"]
-        args: ["python manage.py run_parking_query_grpc"]
-
-        # --- [추가] 볼륨 마운트 ---
-        volumeMounts:
-        - name: db-storage
-          mountPath: /app/data
-
+        command: ["/opt/venv/bin/python"]
+        args: ["manage.py", "run_parking_query_grpc"]
         env:
-        # [수정] SQLite 경로 설정
-        - name: DATABASE_NAME
-          value: "/app/data/query.sqlite3"
-        - name: PARKING_QUERY_DB_NAME
-          value: "/app/data/query.sqlite3"
-
-        # 포트 및 기본 설정
-        - name: PARKING_QUERY_GRPC_PORT
-          value: "50054"
+        - name: PYTHONPATH
+          value: "/app:/app/shared:/app/contracts/gen/python:/app/services/parking-query-service/src"
         - name: DJANGO_SETTINGS_MODULE
           value: "park_py.settings_parking_query"
-        - name: DJANGO_SECRET_KEY
-          valueFrom: { secretKeyRef: { name: parking-secret, key: django_secret_key } }
+        - name: PARKING_QUERY_DB_HOST
+          value: "parking-query-db-service"
+        - name: PARKING_QUERY_DB_NAME
+          value: "parking_db"
+        - name: PARKING_QUERY_DB_USER
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-id } }
+        - name: PARKING_QUERY_DB_PASSWORD
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-password } }
         - name: VEHICLE_SERVICE_GRPC_TARGET
-          value: "vehicle-grpc:500515"
+          value: "vehicle-grpc-service:50015"
         - name: ZONE_SERVICE_GRPC_TARGET
-          value: "zone-grpc:500516"
-        - name: PARKING_COMMAND_SERVICE_GRPC_TARGET
-          value: "parking-query-grpc:500517"
-      # --- [추가] 볼륨 정의 ---
-      volumes:
-      - name: db-storage
-        persistentVolumeClaim:
-          claimName: parking-db-pvc-query
+          value: "zone-grpc-service:50016"
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: parking-query-grpc
+  name: parking-query-grpc-service
 spec:
   selector:
     app: parking-query-grpc
   ports:
-    - port: 50018
+    - protocol: TCP
+      port: 50018
       targetPort: 50018
