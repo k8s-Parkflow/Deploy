@@ -16,52 +16,36 @@ spec:
       - name: app
         image: hyungdongjo/parking-orchestration-app:latest
         imagePullPolicy: Always
-        command: ["gunicorn"]
+        command: ["/opt/venv/bin/gunicorn"]
         args: [
           "--bind", "0.0.0.0:8000",
-          "park_py.wsgi:application",
+          "--workers", "2",
           "--access-logfile", "-",
-          "--error-logfile", "-",
-          "--capture-output",
-          "--log-level", "debug"
+          "park_py.wsgi:application"
         ]
-        ports:
-        - containerPort: 8000
         env:
+        - name: PYTHONPATH
+          value: "/app:/app/shared:/app/contracts/gen/python:/app/services/orchestration-service/src"
         - name: DJANGO_SETTINGS_MODULE
           value: "park_py.settings_orchestration"
-        - name: DATABASE_NAME
-          value: "/app/data/orchestration.sqlite3"
+        - name: ORCHESTRATION_DB_HOST
+          value: "orchestration-db-service"
         - name: ORCHESTRATION_DB_NAME
-          value: "/app/data/orchestration.sqlite3"
+          value: "parking_db"
+        - name: ORCHESTRATION_DB_USER
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-id } }
+        - name: ORCHESTRATION_DB_PASSWORD
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-password } }
         - name: DJANGO_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: parking-secret
-              key: django_secret_key
-
-        # --- gRPC 서비스 주소 설정 추가 (이 부분이 핵심입니다) ---
+          valueFrom: { secretKeyRef: { name: parking-secret, key: django_secret_key } }
         - name: VEHICLE_SERVICE_GRPC_TARGET
-          value: "vehicle-grpc:50015"
+          value: "vehicle-grpc-service:50015"
         - name: ZONE_SERVICE_GRPC_TARGET
-          value: "zone-grpc:50016"
+          value: "zone-grpc-service:50016"
         - name: PARKING_COMMAND_SERVICE_GRPC_TARGET
-          value: "parking-command-grpc:50017"
+          value: "parking-command-grpc-service:50017"
         - name: PARKING_QUERY_SERVICE_GRPC_TARGET
-          value: "parking-query-grpc:50018"
-        # --------------------------------------------------
-
-        volumeMounts:
-        - name: db-storage
-          mountPath: /app/data
-
-      volumes:
-      - name: db-storage
-        hostPath:
-          # 앞서 PV 설정에서 사용하신 경로와 일치하도록 수정하는 것을 권장합니다.
-          path: /mnt/data/parking/orchestration
-          type: DirectoryOrCreate
-
+          value: "parking-query-grpc-service:50018"
 ---
 apiVersion: v1
 kind: Service
@@ -72,5 +56,5 @@ spec:
     app: orchestration-http
   ports:
     - protocol: TCP
-      port: 80
+      port: 8000
       targetPort: 8000
