@@ -18,7 +18,13 @@ docker push hyungdongjo/parking-orchestration-app:latest
 docker push hyungdongjo/parking-vehicle-app:latest 
 docker push hyungdongjo/parking-zone-app:latest 
 docker push hyungdongjo/parking-command-app:latest 
-docker push hyungdongjo/parking-query-app:latest 
+docker push hyungdongjo/parking-query-app:latest
+
+docker pull hyungdongjo/parking-orchestration-app:latest 
+docker pull hyungdongjo/parking-vehicle-app:latest 
+docker pull hyungdongjo/parking-zone-app:latest 
+docker pull hyungdongjo/parking-command-app:latest 
+docker pull hyungdongjo/parking-query-app:latest
 ```
 # [Frontend 빌드 및 푸시]
 ```bash
