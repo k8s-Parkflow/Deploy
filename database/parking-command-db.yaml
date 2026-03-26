@@ -40,16 +40,6 @@ spec:
         volumeMounts:
         - name: mariadb-data
           mountPath: /var/lib/mysql
-        - name: init-sql
-          mountPath: /docker-entrypoint-initdb.d
-      volumes:
-      - name: init-sql
-        configMap:
-          name: parking-db-init-config
-          items:
-          - key: "command-init.sql"
-            path: "01-command.sql"
-
   volumeClaimTemplates:
   - metadata:
       name: mariadb-data
