@@ -35,6 +35,8 @@ spec:
           value: "vehicle-grpc-service:50015"
         - name: ZONE_SERVICE_GRPC_TARGET
           value: "zone-grpc-service:50016"
+        - name: DJANGO_SECRET_KEY
+          valueFrom: { secretKeyRef: { name: parking-secret, key: django_secret_key } }
 ---
 apiVersion: v1
 kind: Service
