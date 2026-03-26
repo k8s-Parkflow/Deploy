@@ -15,13 +15,7 @@ spec:
       containers:
       - name: traffic-bot
         image: hyungdongjo/parking-bot:latest
+        imagePullPolicy: Always
         env:
         - name: API_URL
-          value: "http://orchestration-http"
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 200m
-            memory: 256Mi
+          value: "http://orchestration-http:8000/api/v1/parking"
