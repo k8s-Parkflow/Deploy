@@ -1,0 +1,149 @@
+# 1. Orchestration Service Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: orchestration-migrate-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: migrate
+        image: hyungdongjo/parking-orchestration-app:latest
+        command: ["/bin/sh", "-c"]
+        args: ["/opt/venv/bin/python manage.py migrate --noinput --fake-initial"]
+        env:
+        - name: PYTHONPATH
+          value: "/app:/app/shared:/app/contracts/gen/python:/app/services/orchestration-service/src"
+        - name: DJANGO_SETTINGS_MODULE
+          value: "park_py.settings_orchestration"
+        - name: ORCHESTRATION_DB_HOST
+          value: "orchestration-db-service"
+        - name: ORCHESTRATION_DB_PORT
+          value: "3306"
+        - name: ORCHESTRATION_DB_NAME
+          value: "parking_db"
+        - name: ORCHESTRATION_DB_USER
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-id } }
+        - name: ORCHESTRATION_DB_PASSWORD
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-password } }
+      restartPolicy: OnFailure
+---
+# 2. Parking Command Service Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: parking-command-migrate-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: migrate
+        image: hyungdongjo/parking-command-app:latest
+        command: ["/bin/sh", "-c"]
+        args: ["/opt/venv/bin/python manage.py migrate --noinput --fake-initial"]
+        env:
+        - name: PYTHONPATH
+          value: "/app:/app/shared:/app/contracts/gen/python:/app/services/parking-command-service/src"
+        - name: DJANGO_SETTINGS_MODULE
+          value: "park_py.settings_parking_command"
+        - name: PARKING_COMMAND_DB_HOST
+          value: "parking-command-db-service"
+        - name: PARKING_COMMAND_DB_PORT
+          value: "3306"
+        - name: PARKING_COMMAND_DB_NAME
+          value: "parking_db"
+        - name: PARKING_COMMAND_DB_USER
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-id } }
+        - name: PARKING_COMMAND_DB_PASSWORD
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-password } }
+      restartPolicy: OnFailure
+---
+# 3. Parking Query Service Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: parking-query-migrate-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: migrate
+        image: hyungdongjo/parking-query-app:latest
+        command: ["/bin/sh", "-c"]
+        args: ["/opt/venv/bin/python manage.py migrate --noinput --fake-initial"]
+        env:
+        - name: PYTHONPATH
+          value: "/app:/app/shared:/app/contracts/gen/python:/app/services/parking-query-service/src"
+        - name: DJANGO_SETTINGS_MODULE
+          value: "park_py.settings_parking_query"
+        - name: PARKING_QUERY_DB_HOST
+          value: "parking-query-db-service"
+        - name: PARKING_QUERY_DB_PORT
+          value: "3306"
+        - name: PARKING_QUERY_DB_NAME
+          value: "parking_db"
+        - name: PARKING_QUERY_DB_USER
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-id } }
+        - name: PARKING_QUERY_DB_PASSWORD
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-password } }
+      restartPolicy: OnFailure
+---
+# 4. Vehicle Service Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vehicle-migrate-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: migrate
+        image: hyungdongjo/parking-vehicle-app:latest
+        command: ["/bin/sh", "-c"]
+        args: ["/opt/venv/bin/python manage.py migrate --noinput --fake-initial"]
+        env:
+        - name: PYTHONPATH
+          value: "/app:/app/shared:/app/contracts/gen/python:/app/services/vehicle-service/src"
+        - name: DJANGO_SETTINGS_MODULE
+          value: "park_py.settings_vehicle"
+        - name: VEHICLE_DB_HOST
+          value: "vehicle-db-service"
+        - name: VEHICLE_DB_PORT
+          value: "3306"
+        - name: VEHICLE_DB_NAME
+          value: "parking_db"
+        - name: VEHICLE_DB_USER
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-id } }
+        - name: VEHICLE_DB_PASSWORD
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-password } }
+      restartPolicy: OnFailure
+---
+# 5. Zone Service Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: zone-migrate-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: migrate
+        image: hyungdongjo/parking-zone-app:latest
+        command: ["/bin/sh", "-c"]
+        args: ["/opt/venv/bin/python manage.py migrate --noinput --fake-initial"]
+        env:
+        - name: PYTHONPATH
+          value: "/app:/app/shared:/app/contracts/gen/python:/app/services/zone-service/src"
+        - name: DJANGO_SETTINGS_MODULE
+          value: "park_py.settings_zone"
+        - name: ZONE_DB_HOST
+          value: "zone-db-service"
+        - name: ZONE_DB_PORT
+          value: "3306"
+        - name: ZONE_DB_NAME
+          value: "parking_db"
+        - name: ZONE_DB_USER
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-id } }
+        - name: ZONE_DB_PASSWORD
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-password } }
+      restartPolicy: OnFailure
