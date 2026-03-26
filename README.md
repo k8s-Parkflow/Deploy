@@ -1,10 +1,11 @@
 ## 빌드 및 배포 순서
-# Deploy/docs 참고
+# Deploy/docs 
+```bash
 1. build_Images 
 2. deploy (단, parking-bot 배포는 setup_Parking-Bot 수행 이후)
 3. setup_Parking-Bot
 4. test_Parking-Bot 
-
+```
 
 ## 📁 폴더 구조
 ```
