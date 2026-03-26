@@ -1,5 +1,6 @@
 # 🗄️ Database Deployment Guide
 ```bash
+[마스터 노드]
 # 1. NFS 서버 패키지 설치
 sudo apt update && sudo apt install -y nfs-kernel-server
 
@@ -22,11 +23,12 @@ echo "/srv/nfs/mariadb 10.0.2.0/24(rw,sync,no_subtree_check,no_root_squash)" | s
 sudo exportfs -ra
 sudo systemctl restart nfs-kernel-server
 
+[워커 노드]
 # 6. 워커노드 (모든 워커 노드에서 실행)
 sudo apt update && sudo apt install -y nfs-common
 sudo apt update && sudo apt install -y pigz
-
-# 7. 배포 (마스터 노드에서 실행)
+[마스터 노드]
+# 7. 배포 
 kubectl apply -f pv.yaml
 kubectl apply -f parking-command-db.yaml -f parking-query-db.yaml -f vehicle-db.yaml -f zone-db.yaml -f orchestration-db.yaml
 kubectl apply -f migrate-jobs.yaml
