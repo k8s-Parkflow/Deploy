@@ -1,6 +1,67 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: orchestration-http
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orchestration-http
+  template:
+    metadata:
+      labels:
+        app: orchestration-http
+    spec:
+      containers:
+      - name: app
+        image: hyungdongjo/parking-orchestration-app:latest
+        imagePullPolicy: Always
+        command: ["/opt/venv/bin/gunicorn"]
+        args: [
+          "--bind", "0.0.0.0:8000",
+          "--workers", "2",
+          "--access-logfile", "-",
+          "park_py.wsgi:application"
+        ]
+        env:
+        - name: PYTHONPATH
+          value: "/app:/app/shared:/app/contracts/gen/python:/app/services/orchestration-service/src"
+        - name: DJANGO_SETTINGS_MODULE
+          value: "park_py.settings_orchestration"
+        - name: ORCHESTRATION_DB_HOST
+          value: "orchestration-db-service"
+        - name: ORCHESTRATION_DB_NAME
+          value: "parking_db"
+        - name: ORCHESTRATION_DB_USER
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-id } }
+        - name: ORCHESTRATION_DB_PASSWORD
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-password } }
+        - name: DJANGO_SECRET_KEY
+          valueFrom: { secretKeyRef: { name: parking-secret, key: django_secret_key } }
+        - name: VEHICLE_SERVICE_GRPC_TARGET
+          value: "vehicle-grpc-service:50015"
+        - name: ZONE_SERVICE_GRPC_TARGET
+          value: "zone-grpc-service:50016"
+        - name: PARKING_COMMAND_SERVICE_GRPC_TARGET
+          value: "parking-command-grpc-service:50017"
+        - name: PARKING_QUERY_SERVICE_GRPC_TARGET
+          value: "parking-query-grpc-service:50018"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestration-http
+spec:
+  selector:
+    app: orchestration-http
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+adam@master:~/python_test/Deploy/backend$ cat parking-command-grpc.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: parking-command-grpc
 spec:
   replicas: 1
@@ -16,48 +77,36 @@ spec:
       - name: app
         image: hyungdongjo/parking-command-app:latest
         imagePullPolicy: Always
-        command: ["/bin/sh", "-c"]
-        args: ["python manage.py run_parking_command_grpc"]
-
-        # --- [추가] 볼륨 마운트 ---
-        volumeMounts:
-        - name: db-storage
-          mountPath: /app/data
-
+        command: ["/opt/venv/bin/python"]
+        args: ["manage.py", "run_parking_command_grpc"]
         env:
-        # [수정] SQLite 경로 설정
-        - name: DATABASE_NAME
-          value: "/app/data/command.sqlite3"
-        - name: PARKING_COMMAND_DB_NAME
-          value: "/app/data/command.sqlite3"
-
-        # 포트 및 기본 설정
-        - name: PARKING_COMMAND_GRPC_PORT
-          value: "50053"
+        - name: PYTHONPATH
+          value: "/app:/app/shared:/app/contracts/gen/python:/app/services/parking-command-service/src"
         - name: DJANGO_SETTINGS_MODULE
           value: "park_py.settings_parking_command"
+        - name: PARKING_COMMAND_DB_HOST
+          value: "parking-command-db-service"
+        - name: PARKING_COMMAND_DB_NAME
+          value: "parking_db"
+        - name: PARKING_COMMAND_DB_USER
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-id } }
+        - name: PARKING_COMMAND_DB_PASSWORD
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-password } }
         - name: DJANGO_SECRET_KEY
           valueFrom: { secretKeyRef: { name: parking-secret, key: django_secret_key } }
-
         - name: VEHICLE_SERVICE_GRPC_TARGET
-          value: "vehicle-grpc:50015"
+          value: "vehicle-grpc-service:50015"
         - name: ZONE_SERVICE_GRPC_TARGET
-          value: "zone-grpc:50016"
-        - name: PARKING_QUERY_SERVICE_GRPC_TARGET
-          value: "parking-query-grpc:50018"
-      # --- [추가] 볼륨 정의 ---
-      volumes:
-      - name: db-storage
-        persistentVolumeClaim:
-          claimName: parking-db-pvc-command
+          value: "zone-grpc-service:50016"
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: parking-command-grpc
+  name: parking-command-grpc-service
 spec:
   selector:
     app: parking-command-grpc
   ports:
-    - port: 50017
+    - protocol: TCP
+      port: 50017
       targetPort: 50017
