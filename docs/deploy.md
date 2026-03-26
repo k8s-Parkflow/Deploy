@@ -28,7 +28,8 @@ sudo systemctl restart nfs-kernel-server
 sudo apt update && sudo apt install -y nfs-common
 sudo apt update && sudo apt install -y pigz
 [마스터 노드]
-# 7. 배포 
+# 7. 배포
+cd ~/Deploy/database
 kubectl apply -f pv.yaml
 kubectl apply -f parking-command-db.yaml -f parking-query-db.yaml -f vehicle-db.yaml -f zone-db.yaml -f orchestration-db.yaml
 kubectl apply -f migrate-jobs.yaml
