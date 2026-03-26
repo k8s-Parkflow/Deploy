@@ -16,47 +16,30 @@ spec:
       - name: app
         image: hyungdongjo/parking-zone-app:latest
         imagePullPolicy: Always
-        command: ["/bin/sh", "-c"]
-        args: ["python manage.py run_zone_grpc"]
-
-        # --- [추가] 볼륨 마운트 ---
-        volumeMounts:
-        - name: db-storage
-          mountPath: /app/data
-
+        command: ["/opt/venv/bin/python"]
+        args: ["manage.py", "run_zone_grpc"]
         env:
-        # [수정] SQLite 경로 설정
-        - name: DATABASE_NAME
-          value: "/app/data/zone.sqlite3"
-        - name: ZONE_DB_NAME
-          value: "/app/data/zone.sqlite3"
-
-        # 포트 및 기본 설정
-        - name: ZONE_GRPC_PORT
-          value: "50016"
+        - name: PYTHONPATH
+          value: "/app:/app/shared:/app/contracts/gen/python:/app/services/zone-service/src"
         - name: DJANGO_SETTINGS_MODULE
           value: "park_py.settings_zone"
-        - name: DJANGO_SECRET_KEY
-          valueFrom: { secretKeyRef: { name: parking-secret, key: django_secret_key } }
-        - name: VEHICLE_SERVICE_GRPC_TARGET
-          value: "vehicle-grpc:50015"
-        - name: PARKING_COMMAND_SERVICE_GRPC_TARGET
-          value: "zone-grpc:50017"
-        - name: PARKING_QUERY_SERVICE_GRPC_TARGET
-          value: "parking-query-grpc:50018"
-      # --- [추가] 볼륨 정의 ---
-      volumes:
-      - name: db-storage
-        persistentVolumeClaim:
-          claimName: parking-db-pvc-zone
+        - name: ZONE_DB_HOST
+          value: "zone-db-service"
+        - name: ZONE_DB_NAME
+          value: "parking_db"
+        - name: ZONE_DB_USER
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-id } }
+        - name: ZONE_DB_PASSWORD
+          valueFrom: { secretKeyRef: { name: parking-db-secret, key: user-password } }
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: zone-grpc
+  name: zone-grpc-service
 spec:
   selector:
     app: zone-grpc
   ports:
-    - port: 50016
+    - protocol: TCP
+      port: 50016
       targetPort: 50016
