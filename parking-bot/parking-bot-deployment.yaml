@@ -14,7 +14,8 @@ spec:
     spec:
       containers:
       - name: traffic-bot
-        image: hyungdongjo/parking-bot:v5
+        image: hyungdongjo/parking-bot:latest
+        imagePullPolicy: Always  
         env:
         - name: API_URL
-          value: "http://parking-backend-service/api/v1/parking"
+          value: "http://orchestration-http:8000/api/v1/parking"
