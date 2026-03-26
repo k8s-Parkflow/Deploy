@@ -50,6 +50,6 @@ kubectl apply -f deployment.yaml
 ```bash
 # 1. 배포
 #사전 데이터 주입 필요 : Deploy/docs/setup_Parking-bot.md
-cd ~/Deploy/parking-bot
-kubectl apply -f parking-bot-deployment.yaml
+cd ~/Deploy/database
+kubectl apply -f bot-deployment.yaml
 ```
